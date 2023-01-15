@@ -1,34 +1,34 @@
 from FPS_BPM_Calc import fpsbpmlooper
 from ffmpeg_local import compile_video
+from termcolor import colored
 import os
+import termcolor
 
+COLORS = termcolor
 def main():
     while True:
         print("")
         for i in range(2):
             print("////////////////")
-        print("MEOW v0.1")
+        print(colored("   MEOW v0.1   ",'light_red', ))
         for i in range(2):
             print("////////////////")
-        print("")
-        print("Available Programs:")
-        print("")
-        print("1. FPS and BPM Loop Calculator")
-        print("2. PNG to MP4")
-
-        print("")
+        
+        print(colored("\n Available Programs:\n", 'light_red', attrs=['reverse',]))
+        print(colored("1.",'light_cyan') + " FPS and BPM Loop Calculator ")
+        print(colored("2.",'light_cyan') + " PNG to MP4 ")
 
         # Get the user's choice
-        choice = input("Enter number to RUN: ")
+        choice = input(colored("\nEnter number to RUN: ", 'light_red' ))
 
         try:
             # Run the selected script
             if choice == "1":
-                input_fps = int(input("Enter the FPS value: "))
-                input_bpm = int(input("Enter the BPM value: "))
+                input_fps = int(input(colored("Enter the FPS value: ", 'light_red')))
+                input_bpm = int(input(colored("Enter the BPM value: ", 'light_red')))
                 fpsbpmlooper(fps=input_fps, bpm=input_bpm)
             elif choice == "2":
-                input_path = input("Input Path: ")
+                input_path = input((colored("Input Path: ", 'light_red')))
                 input_path = os.path.expanduser(input_path)
                 compile_video(directory=input_path)
             else:
