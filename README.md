@@ -1,6 +1,14 @@
 # MEOW
 A grip of scripts that make shit easier by Panther Modern
 
+## MEOW BPM-FPS
+
+A program to help you create looped videos for your music. It will display which frames 1/2 notes, 1/4 notes and 1/8 notes fall on and the frame to create an almost perfect 1 bar loop. 
+
+## MEOW SAMPLER
+
+A program that allows you to precisely sample YouTube videos and save it as an MP3
+
 ## Get Started
 
 Okay! First, before you download these scripts. You need the following:
@@ -63,6 +71,4 @@ Here are beginner friendly instructions on HOW to INSTALL both:
 *Note: The above steps assume that you have Git and pip (Python package manager) installed on your Mac. If you don't have them installed, you'll need to install them first.*
 
 
-## MEOW BPM-FPS
 
-## MEOW SAMPLER
