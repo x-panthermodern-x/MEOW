@@ -1,9 +1,10 @@
-from FPS_BPM_Calc import fpsbpmlooper
-from ffmpeg_local import compile_video
+from programs.FPS_BPM_Calc import fpsbpmlooper
+from programs.ffmpeg_local import compile_video
 from termcolor import colored
 import subprocess
 import os
 import termcolor
+
 
 COLORS = termcolor
 
@@ -35,7 +36,7 @@ def main():
                     input(colored("Enter the BPM value: ", 'red')))
                 fpsbpmlooper(fps=input_fps, bpm=input_bpm)
             elif choice == "2":
-                subprocess.run(['python', 'yt_to_mp3.py'])
+                subprocess.run(['python', './programs/yt_to_mp3.py'])
             elif choice == "3":
                 input_path = input((colored("Input Path: ", 'red')))
                 input_path = os.path.dirname(input_path)
