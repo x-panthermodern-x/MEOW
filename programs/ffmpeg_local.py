@@ -22,14 +22,14 @@ def compile_video(directory):
     for i, file in enumerate(files):
         os.rename(os.path.join(directory, file), os.path.join(directory, f'{file_names[i]}.png'))
     
-    print(colored("\nCompiling..." , 'light_cyan'), end='\r')
+    print(colored("\nCompiling..." , 'cyan'), end='\r')
     # Compile the video using FFmpeg
     subprocess.run(['ffmpeg', '-framerate', '24', '-i', f'{directory}/%0{digits_count}d.png', '-c:v', 'libx264', '-r', '24', '-pix_fmt', 'yuv420p', '-y', f'{directory}/output.mp4'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print(colored("      COMPLETED       \n", 'light_cyan' , attrs=['reverse']))
+    print(colored("      COMPLETED       \n", 'cyan' , attrs=['reverse']))
     # Open the video in file explorer
     output_file = os.path.join(directory, 'output.mp4')
     output_file = os.path.abspath(output_file)
-    print("File Location: " + colored(f"{output_file}" , 'light_cyan'))
+    print("File Location: " + colored(f"{output_file}" , 'cyan'))
     subprocess.run(['explorer', output_file])
     
     
