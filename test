@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="/manifest.json" />
+    <script src="/env-config.js"></script>
+    <title>Kinetix</title>
+    <link rel="icon" href="/favicon.ico">
+    <script defer="defer" src="/bundle.e5076c2bb54f0474ad8d.js"></script>
+    <script defer="defer" src="/bundle.3597799d89cbfe9bc604.js"></script>
+    <script defer="defer" src="/bundle.e6685b2b7056a34a1bde.js"></script>
+    <link href="/css/main.94205af0bc312898d1fb.css" rel="stylesheet">
+</head>
+
+<body>
+    <div id="root"></div>
+</body>
+
+</html>

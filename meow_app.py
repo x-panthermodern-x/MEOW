@@ -23,6 +23,7 @@ def main():
         print(colored("1.", 'cyan') + " MEOW FPS / BPM ")
         print(colored("2.", 'cyan') + " MEOW SAMPLER ")
         print(colored("3.", 'cyan') + " PNG to MP4 ")
+        print(colored("4.", 'cyan') + " PNG to GIF ")
 
         # Get the user's choice
         choice = input(colored("\nEnter number to RUN: ", 'red'))
@@ -41,6 +42,8 @@ def main():
                 input_path = input((colored("Input Path: ", 'red')))
                 input_path = os.path.dirname(input_path)
                 compile_video(directory=input_path)
+            elif choice == "4":
+                subprocess.run(['python', './programs/png_to_gif.py'])
             else:
                 print("Invalid choice.")
                 continue
