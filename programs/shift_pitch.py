@@ -21,5 +21,5 @@ def change_pitch(input_directory, percentage):
 
 if __name__ == "__main__":
     input_directory = input("Enter the directory containing the audio files: ")
-    percentage = float(input("Enter the percentage by which to shift the pitch (e.g. -5 for 5% lower): "))
+    percentage = float(input("Enter the semitones by which to shift the pitch (e.g. -5 for 5 semitones lower): "))
     change_pitch(input_directory, percentage)
