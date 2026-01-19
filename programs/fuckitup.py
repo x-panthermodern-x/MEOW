@@ -18,6 +18,7 @@ output_audio = input("Enter output audio file name (including the extension): ")
 # Calculate length of one bar in milliseconds
 beat_length = 60000 / bpm
 one_bar_length = beat_length * 4
+slice_length = int(one_bar_length / 4)
 
 # Get all audio files in input directory
 audio_files = [f for f in os.listdir(input_dir) if f.endswith(".mp3") or f.endswith(".wav")]
@@ -32,7 +33,8 @@ for file in audio_files:
     # Get the duration of the audio
     duration = len(audio)
     # Randomly select a portion of the audio to slice
-    start = random.randint(0, duration - one_bar_length)
+    max_start = max(0, duration - int(one_bar_length))
+    start = random.randint(0, max_start)
     end = start + one_bar_length
     # Slice the audio
     sliced_audio = audio[start:end]

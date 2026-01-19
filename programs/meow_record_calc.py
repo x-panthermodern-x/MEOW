@@ -27,13 +27,12 @@ print("-----------------------------------\n")
 
 def calculate_income_tax(net_profit, tax_brackets):
     tax = 0
-    remaining_profit = net_profit
+    taxable_income = net_profit
 
     for low, high, rate in tax_brackets:
-        if remaining_profit > low:
-            bracket_profit = min(remaining_profit - low, high - low)
-            tax += bracket_profit * rate
-            remaining_profit -= bracket_profit
+        if taxable_income > low:
+            bracket_income = min(taxable_income, high) - low
+            tax += bracket_income * rate
         else:
             break
 
@@ -62,9 +61,9 @@ def record_calculator(records, sell_price, print_cost, mail_order_wage, records_
 
     # Calculate shipping costs
     shipping_cost = records * shipping_per_unit
-     
-     # Calculate income tax
-    income_tax = calculate_income_tax(total_revenue, tax_brackets)
+    # Calculate income tax on net profit
+    pre_tax_profit = total_revenue - (total_print_cost + total_packaging_cost + mail_order_total_wage + shipping_cost)
+    income_tax = calculate_income_tax(pre_tax_profit, tax_brackets)
 
     # Calculate total cost
     total_cost = total_print_cost + total_packaging_cost + mail_order_total_wage + shipping_cost + income_tax
@@ -102,7 +101,7 @@ print(f"{RED}Total Unit Print cost: ${total_print_cost}")
 print(f"Total cost to ship from pressing plant: ${shipping_cost}")
 print(f"Mail order assistant total wage: ${mail_order_total_wage}")
 print(f"Total packaging cost: ${total_packaging_cost}")
-print(f"Est Tax on GROSS: ${income_tax}")
+print(f"Est Tax on NET profit: ${income_tax}")
 print(f"Total cost: ${total_cost}{RESET}")
 
 print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
@@ -122,4 +121,3 @@ average_total_profit = sum(total_profits) / num_runs
 
 print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
 print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
-
