@@ -97,7 +97,12 @@ def run_record_calculator():
     shipping_per_unit = _prompt_float("Shipping cost per unit ($)", 0.69)
     weight_per_record = _prompt_float("Weight per record (kg)", 0.2)
 
-    var_dict = {'Amount of Records: ': records, 'Price you are selling records at: $': sell_price, 'Record Unit Cost: $': unit_cost, 'Mail Order Assistant $/hr: $': mail_order_wage, "Packaging Material Cost: $": packaging_cost, "Number of Mail Order Assistants: ": mail_order_assistants}
+print(f"{RED}Total Unit Print cost: ${total_print_cost}")
+print(f"Total cost to ship from pressing plant: ${shipping_cost}")
+print(f"Mail order assistant total wage: ${mail_order_total_wage}")
+print(f"Total packaging cost: ${total_packaging_cost}")
+print(f"Est Tax on NET profit: ${income_tax}")
+print(f"Total cost: ${total_cost}{RESET}")
 
     # Calculate and print totals
     total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant = record_calculator(records, sell_price, unit_cost, mail_order_wage, records_per_day_range, packaging_cost, mail_order_assistants, shipping_per_unit, weight_per_record)
@@ -117,24 +122,5 @@ def run_record_calculator():
     print(f"Est Tax on NET profit: ${income_tax}")
     print(f"Total cost: ${total_cost}{RESET}")
 
-    print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
-
-    num_runs = 8
-    total_costs = []
-    total_profits = []
-
-    for _ in range(num_runs):
-        _, _, _, _, _, _, _, total_cost, _, total_profit, _ = record_calculator(records, sell_price, unit_cost, mail_order_wage, records_per_day_range, packaging_cost, mail_order_assistants, shipping_per_unit, weight_per_record)
-        total_costs.append(total_cost)
-        total_profits.append(total_profit)
-
-    # Calculate average Total Cost and Total Net Profit
-    average_total_cost = sum(total_costs) / num_runs
-    average_total_profit = sum(total_profits) / num_runs
-
-    print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
-    print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
-
-
-if __name__ == "__main__":
-    run_record_calculator()
+print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
+print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
