@@ -1,4 +1,5 @@
 from programs.FPS_BPM_Calc import fpsbpmlooper
+from programs.meow_record_calc import run_record_calculator
 from programs.ffmpeg_local import compile_video
 from termcolor import colored
 import subprocess
@@ -24,6 +25,7 @@ def main():
         print(colored("2.", 'cyan') + " MEOW SAMPLER ")
         print(colored("3.", 'cyan') + " PNG to MP4 ")
         print(colored("4.", 'cyan') + " PNG to GIF ")
+        print(colored("5.", 'cyan') + " MEOW RECORD CALCULATOR ")
 
         # Get the user's choice
         choice = input(colored("\nEnter number to RUN: ", 'red'))
@@ -44,6 +46,8 @@ def main():
                 compile_video(directory=input_path)
             elif choice == "4":
                 subprocess.run(['python', './programs/png_to_gif.py'])
+            elif choice == "5":
+                run_record_calculator()
             else:
                 print("Invalid choice.")
                 continue

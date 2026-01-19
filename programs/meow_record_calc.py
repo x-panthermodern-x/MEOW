@@ -27,13 +27,12 @@ print("-----------------------------------\n")
 
 def calculate_income_tax(net_profit, tax_brackets):
     tax = 0
-    remaining_profit = net_profit
+    taxable_income = net_profit
 
     for low, high, rate in tax_brackets:
-        if remaining_profit > low:
-            bracket_profit = min(remaining_profit - low, high - low)
-            tax += bracket_profit * rate
-            remaining_profit -= bracket_profit
+        if taxable_income > low:
+            bracket_income = min(taxable_income, high) - low
+            tax += bracket_income * rate
         else:
             break
 
@@ -62,9 +61,9 @@ def record_calculator(records, sell_price, print_cost, mail_order_wage, records_
 
     # Calculate shipping costs
     shipping_cost = records * shipping_per_unit
-     
-     # Calculate income tax
-    income_tax = calculate_income_tax(total_revenue, tax_brackets)
+    # Calculate income tax on net profit
+    pre_tax_profit = total_revenue - (total_print_cost + total_packaging_cost + mail_order_total_wage + shipping_cost)
+    income_tax = calculate_income_tax(pre_tax_profit, tax_brackets)
 
     # Calculate total cost
     total_cost = total_print_cost + total_packaging_cost + mail_order_total_wage + shipping_cost + income_tax
@@ -74,52 +73,97 @@ def record_calculator(records, sell_price, print_cost, mail_order_wage, records_
 
     return total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant
 
-# Variables
-records = 2000 #Total Amount of record your printing
-sell_price = 35 #Price you are selling your records at
-unit_cost = 6 #Average cost per vinyl unit
-mail_order_assistants = 4 #How many people you are hiring to help you out
-mail_order_wage = 20 #How much you are paying your assistants
-records_per_day_range = (100, 160)  # Range for records packed per day by each mail assistant, we are accounting for the slackers here
-packaging_cost = 3  # Assuming $3 per record for packaging cost to ship to fans
-shipping_per_unit = 0.69 #based off atoz media this is $0.69
-weight_per_record = 0.2 # Kilograms
+def _prompt_int(label, default):
+    raw = input(f"{label} [{default}]: ").strip()
+    return int(raw) if raw else default
 
-var_dict = {'Amount of Records: ': records, 'Price you are selling records at: $': sell_price, 'Record Unit Cost: $': unit_cost, 'Mail Order Assistant $/hr: $': mail_order_wage, "Packaging Material Cost: $": packaging_cost, "Number of Mail Order Assistants: ": mail_order_assistants}
 
-# Calculate and print totals
-total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant = record_calculator(records, sell_price, unit_cost, mail_order_wage, records_per_day_range, packaging_cost, mail_order_assistants, shipping_per_unit, weight_per_record)
+def _prompt_float(label, default):
+    raw = input(f"{label} [{default}]: ").strip()
+    return float(raw) if raw else default
 
-for var_name, var_value in var_dict.items():
-    print(f"{CYAN}{var_name}{var_value}{RESET}")
 
-print(f"\n{MAG}Records packed per day by each mail assistant:", records_per_assistant)
-print(f"{mail_order_assistants} Mail order Personnel can pack {total_records_per_day * days_needed} @ {total_records_per_day} records per day in {days_needed} days")
-print(f"\n{CYAN}Calculated Totals:{RESET}")
-print(f"Total GROSS revenue: ${total_revenue}")
+def run_record_calculator():
+    # Variables
+    records = _prompt_int("Amount of Records", 2000)
+    sell_price = _prompt_float("Price you are selling records at ($)", 35)
+    unit_cost = _prompt_float("Record Unit Cost ($)", 6)
+    mail_order_assistants = _prompt_int("Number of Mail Order Assistants", 4)
+    mail_order_wage = _prompt_float("Mail Order Assistant $/hr", 20)
+    packaging_cost = _prompt_float("Packaging Material Cost ($)", 3)
+    records_per_day_min = _prompt_int("Records packed per day (min)", 100)
+    records_per_day_max = _prompt_int("Records packed per day (max)", 160)
+    records_per_day_range = (records_per_day_min, records_per_day_max)
+    shipping_per_unit = _prompt_float("Shipping cost per unit ($)", 0.69)
+    weight_per_record = _prompt_float("Weight per record (kg)", 0.2)
 
-print(f"{RED}Total Unit Print cost: ${total_print_cost}")
-print(f"Total cost to ship from pressing plant: ${shipping_cost}")
-print(f"Mail order assistant total wage: ${mail_order_total_wage}")
-print(f"Total packaging cost: ${total_packaging_cost}")
-print(f"Est Tax on GROSS: ${income_tax}")
-print(f"Total cost: ${total_cost}{RESET}")
+    var_dict = {
+        'Amount of Records: ': records,
+        'Price you are selling records at: $': sell_price,
+        'Record Unit Cost: $': unit_cost,
+        'Mail Order Assistant $/hr: $': mail_order_wage,
+        "Packaging Material Cost: $": packaging_cost,
+        "Number of Mail Order Assistants: ": mail_order_assistants,
+    }
 
-print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
+    # Calculate and print totals
+    total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant = record_calculator(
+        records,
+        sell_price,
+        unit_cost,
+        mail_order_wage,
+        records_per_day_range,
+        packaging_cost,
+        mail_order_assistants,
+        shipping_per_unit,
+        weight_per_record,
+    )
 
-num_runs = 8
-total_costs = []
-total_profits = []
+    for var_name, var_value in var_dict.items():
+        print(f"{CYAN}{var_name}{var_value}{RESET}")
 
-for _ in range(num_runs):
-    _, _, _, _, _, _, _, total_cost, _, total_profit, _ = record_calculator(records, sell_price, unit_cost, mail_order_wage, records_per_day_range, packaging_cost, mail_order_assistants, shipping_per_unit, weight_per_record)
-    total_costs.append(total_cost)
-    total_profits.append(total_profit)
+    print(f"\n{MAG}Records packed per day by each mail assistant:", records_per_assistant)
+    print(
+        f"{mail_order_assistants} Mail order Personnel can pack {total_records_per_day * days_needed} @ {total_records_per_day} records per day in {days_needed} days"
+    )
+    print(f"\n{CYAN}Calculated Totals:{RESET}")
+    print(f"Total GROSS revenue: ${total_revenue}")
 
-# Calculate average Total Cost and Total Net Profit
-average_total_cost = sum(total_costs) / num_runs
-average_total_profit = sum(total_profits) / num_runs
+    print(f"{RED}Total Unit Print cost: ${total_print_cost}")
+    print(f"Total cost to ship from pressing plant: ${shipping_cost}")
+    print(f"Mail order assistant total wage: ${mail_order_total_wage}")
+    print(f"Total packaging cost: ${total_packaging_cost}")
+    print(f"Est Tax on NET profit: ${income_tax}")
+    print(f"Total cost: ${total_cost}{RESET}")
 
-print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
-print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
+    print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
 
+    num_runs = 8
+    total_costs = []
+    total_profits = []
+
+    for _ in range(num_runs):
+        _, _, _, _, _, _, _, total_cost, _, total_profit, _ = record_calculator(
+            records,
+            sell_price,
+            unit_cost,
+            mail_order_wage,
+            records_per_day_range,
+            packaging_cost,
+            mail_order_assistants,
+            shipping_per_unit,
+            weight_per_record,
+        )
+        total_costs.append(total_cost)
+        total_profits.append(total_profit)
+
+    # Calculate average Total Cost and Total Net Profit
+    average_total_cost = sum(total_costs) / num_runs
+    average_total_profit = sum(total_profits) / num_runs
+
+    print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
+    print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
+
+
+if __name__ == "__main__":
+    run_record_calculator()
