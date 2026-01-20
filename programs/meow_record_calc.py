@@ -21,9 +21,10 @@ tax_brackets = [
     (5000001, float('inf'), 0.123)
 ]
 
-print("-----------------------------------")
-print(f"{RED} MEOW RECORD PRODUCTION CALCULATOR{RESET}")
-print("-----------------------------------\n")
+def _print_header():
+    print("-----------------------------------")
+    print(f"{RED} MEOW RECORD PRODUCTION CALCULATOR{RESET}")
+    print("-----------------------------------\n")
 
 def calculate_income_tax(net_profit, tax_brackets):
     tax = 0
@@ -84,6 +85,7 @@ def _prompt_float(label, default):
 
 
 def run_record_calculator():
+    _print_header()
     # Variables
     records = _prompt_int("Amount of Records", 2000)
     sell_price = _prompt_float("Price you are selling records at ($)", 35)
