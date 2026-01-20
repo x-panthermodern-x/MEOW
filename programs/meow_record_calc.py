@@ -282,110 +282,88 @@ def prompt_float(label: str, default: float) -> float:
     raw = input(f"{label} [{default}]: ").strip()
     return float(raw) if raw else default
 
-def prompt_date(label: str, default: date) -> date:
-    raw = input(f"{label} [{default.isoformat()}] (YYYY-MM-DD): ").strip()
-    if not raw:
-        return default
-    y, m, d = raw.split("-")
-    return date(int(y), int(m), int(d))
 
-# ---------- Output ----------
+def run_record_calculator():
+    # Variables
+    records = _prompt_int("Amount of Records", 2000)
+    sell_price = _prompt_float("Price you are selling records at ($)", 35)
+    unit_cost = _prompt_float("Record Unit Cost ($)", 6)
+    mail_order_assistants = _prompt_int("Number of Mail Order Assistants", 4)
+    mail_order_wage = _prompt_float("Mail Order Assistant $/hr", 20)
+    packaging_cost = _prompt_float("Packaging Material Cost ($)", 3)
+    records_per_day_min = _prompt_int("Records packed per day (min)", 100)
+    records_per_day_max = _prompt_int("Records packed per day (max)", 160)
+    records_per_day_range = (records_per_day_min, records_per_day_max)
+    shipping_per_unit = _prompt_float("Shipping cost per unit ($)", 0.69)
+    weight_per_record = _prompt_float("Weight per record (kg)", 0.2)
 
-def print_pnl(p: Dict[str, float]) -> None:
-    print("\n-------------------------------")
-    print("MEOW RELEASE P&L (Summary)")
-    print("-------------------------------")
-    print(f"Units pressed:                {int(p['units'])}")
-    print(f"Units sold (assumed):         {int(p['units_sold'])}")
-    print(f"Manufacturing total:          {money(p['manufacturing_total'])}")
-    print(f"Fixed release costs:          {money(p['fixed_total'])}")
-    print(f"Total cost basis:             {money(p['total_cost_basis'])}")
-    print(f"Manufacturing $/unit:         {money(p['manufacturing_cost_per_unit'])}")
-    print(f"All-in $/unit:                {money(p['all_in_cost_per_unit'])}")
-    print("")
-    print(f"Unit price:                   {money(p['unit_price'])}")
-    print(f"Gross revenue:                {money(p['gross_revenue'])}")
-    print(f"Estimated orders:             {int(p['est_orders'])}")
-    print(f"Processing fees (est):        {money(p['processing_fees'])}")
-    print(f"Net profit (pre-tax):         {money(p['net_profit_pre_tax'])}")
-    print("")
-    print(f"Break-even price (w/ fees):   {money(p['break_even_price_including_processing'])}")
+    var_dict = {
+        'Amount of Records: ': records,
+        'Price you are selling records at: $': sell_price,
+        'Record Unit Cost: $': unit_cost,
+        'Mail Order Assistant $/hr: $': mail_order_wage,
+        "Packaging Material Cost: $": packaging_cost,
+        "Number of Mail Order Assistants: ": mail_order_assistants,
+    }
 
-def print_cashflow(rows: List[Dict[str, object]]) -> None:
-    print("\n----------------------------------------------")
-    print("CASH-FLOW TIMELINE (Monthly, after processing)")
-    print("----------------------------------------------")
-    print(f"{'Month':<8}  {'Cash In':>12}  {'Cash Out':>12}  {'Net':>12}  {'Cumulative':>12}  Details")
-    print("-" * 90)
-    for r in rows:
-        print(
-            f"{r['month']:<8}  "
-            f"{money(r['cash_in_after_processing']):>12}  "
-            f"{money(r['cash_out']):>12}  "
-            f"{money(r['net']):>12}  "
-            f"{money(r['cumulative']):>12}  "
-            f"{r['detail']}"
+    # Calculate and print totals
+    total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant = record_calculator(
+        records,
+        sell_price,
+        unit_cost,
+        mail_order_wage,
+        records_per_day_range,
+        packaging_cost,
+        mail_order_assistants,
+        shipping_per_unit,
+        weight_per_record,
+    )
+
+    for var_name, var_value in var_dict.items():
+        print(f"{CYAN}{var_name}{var_value}{RESET}")
+
+    print(f"\n{MAG}Records packed per day by each mail assistant:", records_per_assistant)
+    print(
+        f"{mail_order_assistants} Mail order Personnel can pack {total_records_per_day * days_needed} @ {total_records_per_day} records per day in {days_needed} days"
+    )
+    print(f"\n{CYAN}Calculated Totals:{RESET}")
+    print(f"Total GROSS revenue: ${total_revenue}")
+
+    print(f"{RED}Total Unit Print cost: ${total_print_cost}")
+    print(f"Total cost to ship from pressing plant: ${shipping_cost}")
+    print(f"Mail order assistant total wage: ${mail_order_total_wage}")
+    print(f"Total packaging cost: ${total_packaging_cost}")
+    print(f"Est Tax on NET profit: ${income_tax}")
+    print(f"Total cost: ${total_cost}{RESET}")
+
+    print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
+
+    num_runs = 8
+    total_costs = []
+    total_profits = []
+
+    for _ in range(num_runs):
+        _, _, _, _, _, _, _, total_cost, _, total_profit, _ = record_calculator(
+            records,
+            sell_price,
+            unit_cost,
+            mail_order_wage,
+            records_per_day_range,
+            packaging_cost,
+            mail_order_assistants,
+            shipping_per_unit,
+            weight_per_record,
         )
+        total_costs.append(total_cost)
+        total_profits.append(total_profit)
 
-# ---------- Main ----------
+    # Calculate average Total Cost and Total Net Profit
+    average_total_cost = sum(total_costs) / num_runs
+    average_total_profit = sum(total_profits) / num_runs
 
-def main() -> None:
-    print("-----------------------------------")
-    print(" MEOW RECORD RELEASE CALCULATOR v2 ")
-    print("-----------------------------------\n")
+    print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
+    print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
 
-    # Defaults based on your receipt + stated fixed costs
-    release = ReleaseCosts(
-        marketing=5000.0,
-        mastering=2000.0,
-        artwork=1000.0,
-    )
-    mfg = Manufacturing(
-        units=560,
-        manufacturing_total=4294.05,
-    )
-    fees = ShopifyFees(rate=0.029, fixed_per_order=0.30)
-
-    # Prompts
-    release_date = prompt_date("Release date", date.today())
-    unit_price = prompt_float("Unit price ($)", 35.0)
-    sell_through = prompt_float("Sell-through (0-1)", 1.0)
-    months_to_sell = prompt_int("Months to sell through", 8)
-    avg_units_per_order = prompt_float("Avg units per order (1.0 = conservative)", 1.0)
-
-    # If you want to override receipt numbers:
-    mfg.units = prompt_int("Units pressed", mfg.units)
-    mfg.manufacturing_total = prompt_float("Manufacturing total (invoice, landed)", mfg.manufacturing_total)
-
-    # Override fixed costs if needed
-    release.marketing = prompt_float("Marketing ($)", release.marketing)
-    release.mastering = prompt_float("Mastering ($)", release.mastering)
-    release.artwork = prompt_float("Artwork ($)", release.artwork)
-
-    sales = SalesPlan(
-        unit_price=unit_price,
-        avg_units_per_order=avg_units_per_order,
-        sell_through=sell_through,
-        months_to_sell=months_to_sell,
-        monthly_weights=None,  # use default curve
-    )
-
-    # Cash-flow schedule defaults (tweak these once and you’ll reuse forever)
-    sched = CashFlowSchedule(
-        release_date=release_date,
-        mfg_deposit_pct=0.50,
-        mfg_deposit_months_before_release=4,
-        mfg_balance_months_before_release=2,
-        mastering_months_before_release=3,
-        artwork_months_before_release=3,
-        marketing_profile={-1: 0.25, 0: 0.50, 1: 0.25},
-    )
-
-    pnl = compute_release_pnl(mfg=mfg, fixed=release, sales=sales, fees=fees)
-    print_pnl(pnl)
-
-    rows = build_cashflow_timeline(mfg=mfg, fixed=release, sales=sales, fees=fees, sched=sched)
-    print_cashflow(rows)
 
 if __name__ == "__main__":
     main()
