@@ -36,17 +36,16 @@ def main():
         print(colored("\n Available Programs:\n",
               'red', attrs=['reverse',]))
         print(colored("1.", 'cyan') + " MEOW FPS / BPM ")
-        print(colored("2.", 'cyan') + " YOUTUBE to MP3 - MEOW SAMPLER ")
+        print(colored("2.", 'cyan') + " YOUTUBE AUDIO - MP3 / WAV ")
         print(colored("3.", 'cyan') + " PNG to MP4 ")
         print(colored("4.", 'cyan') + " PNG to GIF ")
         print(colored("5.", 'cyan') + " MEOW RECORD CALCULATOR ")
-        print(colored("6.", 'cyan') + " YOUTUBE to WAV ")
-        print(colored("7.", 'cyan') + " MIDI to CSV ")
-        print(colored("8.", 'cyan') + " MIDI to OSC ")
-        print(colored("9.", 'cyan') + " SHIFT AUDIO PITCH ")
-        print(colored("10.", 'cyan') + " FUCK IT UP - AUDIO ")
-        print(colored("11.", 'cyan') + " FUCK IT UP - VIDEO ")
-        print(colored("12.", 'cyan') + " M4A to MP3 ")
+        print(colored("6.", 'cyan') + " MIDI to CSV ")
+        print(colored("7.", 'cyan') + " MIDI to OSC ")
+        print(colored("8.", 'cyan') + " SHIFT AUDIO PITCH ")
+        print(colored("9.", 'cyan') + " FUCK IT UP - AUDIO ")
+        print(colored("10.", 'cyan') + " FUCK IT UP - VIDEO ")
+        print(colored("11.", 'cyan') + " M4A to MP3 ")
         print(colored("X.", 'cyan') + " EXIT ")
 
         # Get the user's choice
@@ -73,18 +72,16 @@ def main():
             elif choice == "5":
                 run_record_calculator()
             elif choice == "6":
-                run_program('yt_to_wav.py')
-            elif choice == "7":
                 run_program('midi_to_csv.py')
-            elif choice == "8":
+            elif choice == "7":
                 run_program('midi_to_osc.py')
-            elif choice == "9":
+            elif choice == "8":
                 run_program('shift_pitch.py')
-            elif choice == "10":
+            elif choice == "9":
                 run_program('fuckitup.py')
-            elif choice == "11":
+            elif choice == "10":
                 run_program('fuckitup_video.py')
-            elif choice == "12":
+            elif choice == "11":
                 run_program('m4a2mp3.py')
             elif choice.lower() == "x":
                 print(colored("\nGoodbye from MEOW.\n", 'red'))
