@@ -2,21 +2,20 @@ from programs.FPS_BPM_Calc import fpsbpmlooper
 from programs.meow_record_calc import run_record_calculator
 from termcolor import colored
 import subprocess
-import os
 from pathlib import Path
 import sys
-import termcolor
 
 
-COLORS = termcolor
 APP_DIRECTORY = Path(__file__).resolve().parent
-PROGRAMS_DIRECTORY = APP_DIRECTORY / "programs"
 
 
 def run_program(script_name):
     """Run a program with the same Python interpreter used for MEOW."""
-    script_path = PROGRAMS_DIRECTORY / script_name
-    result = subprocess.run([sys.executable, str(script_path)])
+    module_name = f"programs.{Path(script_name).stem}"
+    result = subprocess.run(
+        [sys.executable, "-m", module_name],
+        cwd=APP_DIRECTORY,
+    )
     if result.returncode != 0:
         print(colored(
             f"\n{script_name} exited with error code {result.returncode}.",
@@ -64,9 +63,11 @@ def main():
             elif choice == "3":
                 from programs.ffmpeg_local import compile_video
 
-                input_path = input((colored("Input Path: ", 'red')))
-                input_path = os.path.dirname(input_path)
-                compile_video(directory=input_path)
+                input_path = Path(
+                    input(colored("PNG file or folder path: ", 'red')).strip().strip('"')
+                ).expanduser()
+                directory = input_path if input_path.is_dir() else input_path.parent
+                compile_video(directory=directory)
             elif choice == "4":
                 run_program('png_to_gif.py')
             elif choice == "5":

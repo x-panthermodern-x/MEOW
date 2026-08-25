@@ -4,7 +4,12 @@ import subprocess
 import tempfile
 
 import yt_dlp
-from termcolor import colored
+
+try:
+    from termcolor import colored
+except ImportError:
+    def colored(text, *_args, **_kwargs):
+        return text
 
 
 def to_seconds(time_string):

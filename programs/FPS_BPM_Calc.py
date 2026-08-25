@@ -2,6 +2,11 @@ import math
 from termcolor import colored
 
 def fpsbpmlooper(fps, bpm):
+    if fps <= 0:
+        raise ValueError("FPS must be greater than zero.")
+    if bpm <= 0:
+        raise ValueError("BPM must be greater than zero.")
+
     while True:
         # # Prompt the user for the FPS value
         # fps = int(input("Enter the FPS value: "))

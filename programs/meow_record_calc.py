@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional
 import math
 
 # ---------- Utils ----------
@@ -29,11 +29,21 @@ class ShopifyFees:
     rate: float = 0.029       # 2.9%
     fixed_per_order: float = 0.30
 
+    def __post_init__(self):
+        if not 0 <= self.rate < 1:
+            raise ValueError("Processing-fee rate must be between 0 and 1.")
+        if self.fixed_per_order < 0:
+            raise ValueError("Fixed processing fee cannot be negative.")
+
 @dataclass
 class ReleaseCosts:
     marketing: float = 5000.0
     mastering: float = 2000.0
     artwork: float = 1000.0
+
+    def __post_init__(self):
+        if min(self.marketing, self.mastering, self.artwork) < 0:
+            raise ValueError("Release costs cannot be negative.")
 
     @property
     def total(self) -> float:
@@ -43,6 +53,12 @@ class ReleaseCosts:
 class Manufacturing:
     units: int = 560
     manufacturing_total: float = 4294.05  # your AtoZ subtotal (includes inbound freight + delivery)
+
+    def __post_init__(self):
+        if self.units <= 0:
+            raise ValueError("Units pressed must be greater than zero.")
+        if self.manufacturing_total < 0:
+            raise ValueError("Manufacturing total cannot be negative.")
 
     @property
     def cost_per_unit(self) -> float:
@@ -64,6 +80,16 @@ class SalesPlan:
     # Distribution of sales across months after release.
     # If None, uses a simple front-loaded curve.
     monthly_weights: Optional[List[float]] = None
+
+    def __post_init__(self):
+        if self.unit_price < 0:
+            raise ValueError("Unit price cannot be negative.")
+        if self.avg_units_per_order < 1:
+            raise ValueError("Average units per order must be at least 1.")
+        if not 0 <= self.sell_through <= 1:
+            raise ValueError("Sell-through must be between 0 and 1.")
+        if self.months_to_sell < 1:
+            raise ValueError("Months to sell through must be at least 1.")
 
 @dataclass
 class CashFlowSchedule:
@@ -95,12 +121,25 @@ class CashFlowSchedule:
 
     # Marketing spending profile (fractions must sum to 1.0)
     # Example: 25% one month before release, 50% on release month, 25% one month after.
-    marketing_profile: Dict[int, float] = None  # {month_offset: fraction_of_marketing}
+    marketing_profile: Optional[Dict[int, float]] = None
 
     def __post_init__(self):
+        if not 0 <= self.mfg_deposit_pct <= 1:
+            raise ValueError("Manufacturing deposit percentage must be between 0 and 1.")
+        timing_values = (
+            self.mfg_deposit_months_before_release,
+            self.mfg_balance_months_before_release,
+            self.mastering_months_before_release,
+            self.artwork_months_before_release,
+        )
+        if min(timing_values) < 0:
+            raise ValueError("Months-before-release values cannot be negative.")
         if self.marketing_profile is None:
             self.marketing_profile = {-1: 0.25, 0: 0.50, 1: 0.25}
-        # sanity check (soft)
+        if not self.marketing_profile:
+            raise ValueError("Marketing profile cannot be empty.")
+        if any(fraction < 0 for fraction in self.marketing_profile.values()):
+            raise ValueError("Marketing-profile fractions cannot be negative.")
         s = sum(self.marketing_profile.values())
         if not (0.999 <= s <= 1.001):
             raise ValueError(f"marketing_profile fractions must sum to 1.0, got {s}")
@@ -121,6 +160,42 @@ def default_sales_weights(months: int) -> List[float]:
     total = sum(raw)
     return [x / total for x in raw]
 
+
+def estimate_orders(units_sold: int, avg_units_per_order: float) -> int:
+    if units_sold <= 0:
+        return 0
+    return math.ceil(units_sold / avg_units_per_order)
+
+
+def allocate_integer_total(total: int, weights: List[float]) -> List[int]:
+    """Allocate an integer total proportionally without rounding drift."""
+    if total < 0:
+        raise ValueError("Allocation total cannot be negative.")
+    if not weights:
+        if total == 0:
+            return []
+        raise ValueError("Cannot allocate a positive total without weights.")
+    if any(weight < 0 for weight in weights):
+        raise ValueError("Allocation weights cannot be negative.")
+
+    weight_total = sum(weights)
+    if weight_total <= 0:
+        if total == 0:
+            return [0] * len(weights)
+        raise ValueError("Allocation weights must have a positive sum.")
+
+    exact = [total * weight / weight_total for weight in weights]
+    allocated = [math.floor(value) for value in exact]
+    remainder = total - sum(allocated)
+    order = sorted(
+        range(len(weights)),
+        key=lambda index: exact[index] - allocated[index],
+        reverse=True,
+    )
+    for index in order[:remainder]:
+        allocated[index] += 1
+    return allocated
+
 def compute_release_pnl(
     mfg: Manufacturing,
     fixed: ReleaseCosts,
@@ -131,7 +206,7 @@ def compute_release_pnl(
     gross_revenue = units_sold * sales.unit_price
 
     # Conservative: estimate orders from avg units/order
-    est_orders = math.ceil(units_sold / max(1e-9, sales.avg_units_per_order))
+    est_orders = estimate_orders(units_sold, sales.avg_units_per_order)
 
     processing_fees = gross_revenue * fees.rate + est_orders * fees.fixed_per_order
 
@@ -173,23 +248,14 @@ def build_cashflow_timeline(
     """
     # ---- Sales curve ----
     units_sold_total = int(round(mfg.units * sales.sell_through))
-    months = max(0, int(sales.months_to_sell))
+    months = sales.months_to_sell
     weights = sales.monthly_weights or default_sales_weights(months)
     if len(weights) != months:
         raise ValueError("monthly_weights must match months_to_sell length")
 
-    # Allocate unit sales by month (integers that sum exactly)
-    units_by_month = [int(round(units_sold_total * w)) for w in weights]
-    # fix rounding drift
-    drift = units_sold_total - sum(units_by_month)
-    i = 0
-    while drift != 0 and months > 0:
-        units_by_month[i % months] += 1 if drift > 0 else -1
-        drift = units_sold_total - sum(units_by_month)
-        i += 1
-
-    # Estimate orders by month
-    orders_by_month = [math.ceil(u / max(1e-9, sales.avg_units_per_order)) if u > 0 else 0 for u in units_by_month]
+    units_by_month = allocate_integer_total(units_sold_total, weights)
+    total_orders = estimate_orders(units_sold_total, sales.avg_units_per_order)
+    orders_by_month = allocate_integer_total(total_orders, units_by_month)
 
     # ---- Timeline range ----
     # Start from earliest outflow month through last sales month
@@ -230,7 +296,6 @@ def build_cashflow_timeline(
         # cash in from sales
         idx = mo  # sales start at 0
         cash_in = 0.0
-        processing = 0.0
         if 0 <= idx < months:
             u = units_by_month[idx]
             o = orders_by_month[idx]
@@ -283,86 +348,126 @@ def prompt_float(label: str, default: float) -> float:
     return float(raw) if raw else default
 
 
-def run_record_calculator():
-    # Variables
-    records = _prompt_int("Amount of Records", 2000)
-    sell_price = _prompt_float("Price you are selling records at ($)", 35)
-    unit_cost = _prompt_float("Record Unit Cost ($)", 6)
-    mail_order_assistants = _prompt_int("Number of Mail Order Assistants", 4)
-    mail_order_wage = _prompt_float("Mail Order Assistant $/hr", 20)
-    packaging_cost = _prompt_float("Packaging Material Cost ($)", 3)
-    records_per_day_min = _prompt_int("Records packed per day (min)", 100)
-    records_per_day_max = _prompt_int("Records packed per day (max)", 160)
-    records_per_day_range = (records_per_day_min, records_per_day_max)
-    shipping_per_unit = _prompt_float("Shipping cost per unit ($)", 0.69)
-    weight_per_record = _prompt_float("Weight per record (kg)", 0.2)
+def prompt_date(label: str, default: date) -> date:
+    raw = input(f"{label} [{default.isoformat()}] (YYYY-MM-DD): ").strip()
+    if not raw:
+        return default
+    year, month, day = raw.split("-")
+    return date(int(year), int(month), int(day))
 
-    var_dict = {
-        'Amount of Records: ': records,
-        'Price you are selling records at: $': sell_price,
-        'Record Unit Cost: $': unit_cost,
-        'Mail Order Assistant $/hr: $': mail_order_wage,
-        "Packaging Material Cost: $": packaging_cost,
-        "Number of Mail Order Assistants: ": mail_order_assistants,
-    }
 
-    # Calculate and print totals
-    total_revenue, total_print_cost, total_records_per_day, days_needed, mail_order_total_wage, total_packaging_cost, shipping_cost, total_cost, income_tax, total_profit, records_per_assistant = record_calculator(
-        records,
-        sell_price,
-        unit_cost,
-        mail_order_wage,
-        records_per_day_range,
-        packaging_cost,
-        mail_order_assistants,
-        shipping_per_unit,
-        weight_per_record,
-    )
+def print_pnl(result: Dict[str, float]) -> None:
+    print("\n-------------------------------")
+    print("MEOW RELEASE P&L (Summary)")
+    print("-------------------------------")
+    print(f"Units pressed:                {int(result['units'])}")
+    print(f"Units sold (assumed):         {int(result['units_sold'])}")
+    print(f"Manufacturing total:          {money(result['manufacturing_total'])}")
+    print(f"Fixed release costs:          {money(result['fixed_total'])}")
+    print(f"Total cost basis:             {money(result['total_cost_basis'])}")
+    print(f"Manufacturing $/unit:         {money(result['manufacturing_cost_per_unit'])}")
+    print(f"All-in $/pressed unit:        {money(result['all_in_cost_per_unit'])}")
+    print("")
+    print(f"Unit price:                   {money(result['unit_price'])}")
+    print(f"Gross revenue:                {money(result['gross_revenue'])}")
+    print(f"Estimated orders:             {int(result['est_orders'])}")
+    print(f"Processing fees (estimated):  {money(result['processing_fees'])}")
+    print(f"Net profit (pre-tax):         {money(result['net_profit_pre_tax'])}")
+    print("")
+    print(f"Break-even price (with fees): {money(result['break_even_price_including_processing'])}")
 
-    for var_name, var_value in var_dict.items():
-        print(f"{CYAN}{var_name}{var_value}{RESET}")
 
-    print(f"\n{MAG}Records packed per day by each mail assistant:", records_per_assistant)
-    print(
-        f"{mail_order_assistants} Mail order Personnel can pack {total_records_per_day * days_needed} @ {total_records_per_day} records per day in {days_needed} days"
-    )
-    print(f"\n{CYAN}Calculated Totals:{RESET}")
-    print(f"Total GROSS revenue: ${total_revenue}")
-
-    print(f"{RED}Total Unit Print cost: ${total_print_cost}")
-    print(f"Total cost to ship from pressing plant: ${shipping_cost}")
-    print(f"Mail order assistant total wage: ${mail_order_total_wage}")
-    print(f"Total packaging cost: ${total_packaging_cost}")
-    print(f"Est Tax on NET profit: ${income_tax}")
-    print(f"Total cost: ${total_cost}{RESET}")
-
-    print(f"{GREEN}Total NET profit: ${total_profit}{RESET}")
-
-    num_runs = 8
-    total_costs = []
-    total_profits = []
-
-    for _ in range(num_runs):
-        _, _, _, _, _, _, _, total_cost, _, total_profit, _ = record_calculator(
-            records,
-            sell_price,
-            unit_cost,
-            mail_order_wage,
-            records_per_day_range,
-            packaging_cost,
-            mail_order_assistants,
-            shipping_per_unit,
-            weight_per_record,
+def print_cashflow(rows: List[Dict[str, object]]) -> None:
+    print("\n----------------------------------------------")
+    print("CASH-FLOW TIMELINE (Monthly, after processing)")
+    print("----------------------------------------------")
+    print(f"{'Month':<8}  {'Cash In':>12}  {'Cash Out':>12}  {'Net':>12}  {'Cumulative':>12}  Details")
+    print("-" * 90)
+    for row in rows:
+        print(
+            f"{row['month']:<8}  "
+            f"{money(row['cash_in_after_processing']):>12}  "
+            f"{money(row['cash_out']):>12}  "
+            f"{money(row['net']):>12}  "
+            f"{money(row['cumulative']):>12}  "
+            f"{row['detail']}"
         )
-        total_costs.append(total_cost)
-        total_profits.append(total_profit)
 
-    # Calculate average Total Cost and Total Net Profit
-    average_total_cost = sum(total_costs) / num_runs
-    average_total_profit = sum(total_profits) / num_runs
 
-    print(f"\n{CYAN}Average Total Cost after {num_runs} runs: ${average_total_cost:.2f}")
-    print(f"Average Total Net Profit after {num_runs} runs: ${average_total_profit:.2f}{RESET}")
+def run_record_calculator() -> None:
+    print("-----------------------------------")
+    print(" MEOW RECORD RELEASE CALCULATOR v2 ")
+    print("-----------------------------------\n")
+
+    release_date = prompt_date("Release date", date.today())
+    unit_price = prompt_float("Unit price ($)", 35.0)
+    sell_through = prompt_float("Sell-through (0-1)", 1.0)
+    months_to_sell = prompt_int("Months to sell through", 8)
+    avg_units_per_order = prompt_float(
+        "Average units per order (1.0 = conservative)",
+        1.0,
+    )
+    units = prompt_int("Units pressed", 560)
+    manufacturing_total = prompt_float(
+        "Manufacturing total (landed invoice, $)",
+        4294.05,
+    )
+    marketing = prompt_float("Marketing ($)", 5000.0)
+    mastering = prompt_float("Mastering ($)", 2000.0)
+    artwork = prompt_float("Artwork ($)", 1000.0)
+    processing_rate_pct = prompt_float("Processing rate (%)", 2.9)
+    processing_fixed = prompt_float("Fixed processing fee per order ($)", 0.30)
+
+    manufacturing = Manufacturing(
+        units=units,
+        manufacturing_total=manufacturing_total,
+    )
+    release_costs = ReleaseCosts(
+        marketing=marketing,
+        mastering=mastering,
+        artwork=artwork,
+    )
+    sales = SalesPlan(
+        unit_price=unit_price,
+        avg_units_per_order=avg_units_per_order,
+        sell_through=sell_through,
+        months_to_sell=months_to_sell,
+    )
+    fees = ShopifyFees(
+        rate=processing_rate_pct / 100,
+        fixed_per_order=processing_fixed,
+    )
+    schedule = CashFlowSchedule(
+        release_date=release_date,
+        mfg_deposit_pct=0.50,
+        mfg_deposit_months_before_release=4,
+        mfg_balance_months_before_release=2,
+        mastering_months_before_release=3,
+        artwork_months_before_release=3,
+        marketing_profile={-1: 0.25, 0: 0.50, 1: 0.25},
+    )
+
+    result = compute_release_pnl(
+        mfg=manufacturing,
+        fixed=release_costs,
+        sales=sales,
+        fees=fees,
+    )
+    cashflow = build_cashflow_timeline(
+        mfg=manufacturing,
+        fixed=release_costs,
+        sales=sales,
+        fees=fees,
+        sched=schedule,
+    )
+
+    print_pnl(result)
+    print_cashflow(cashflow)
+    print("\nAssumptions: customer-paid outbound postage and income taxes are excluded.")
+
+
+def main() -> None:
+    run_record_calculator()
 
 
 if __name__ == "__main__":

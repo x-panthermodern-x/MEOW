@@ -1,4 +1,5 @@
 import csv
+import os
 import mido
 
 def convert_midi_to_csv(input_file):

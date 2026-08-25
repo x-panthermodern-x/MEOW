@@ -30,7 +30,7 @@ def convert_midi_to_osc(input_file):
 
     # Save the bundle to a file
     with open(output_file, "wb") as f:
-        f.write(bundle.build().dumps())
+        f.write(bundle.build().dgram)
     print(f"Converted {input_file} to {output_file}")
 
 if __name__ == "__main__":

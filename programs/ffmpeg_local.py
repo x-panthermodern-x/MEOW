@@ -1,42 +1,60 @@
+from pathlib import Path
 import os
+import shutil
 import subprocess
-from termcolor import colored
-from tqdm import tqdm
+import tempfile
 
 
-def compile_video(directory):
-    # Get all the png files in the specified directory
-    files = [f for f in os.listdir(directory) if f.endswith('.png')]
-    # Sort the files by name
-    files.sort()
+def compile_video(directory, frame_rate=24):
+    directory = Path(directory).expanduser()
+    if not directory.is_dir():
+        raise ValueError(f"Folder does not exist: {directory}")
 
-    # Find the file names and the amount of digits appended to the end of the files
-    file_names = []
-    digits_count = 0
-    for file in files:
-        name, ext = os.path.splitext(file)
-        file_name = name.split("_")[-1]
-        file_names.append(file_name)
-        digits_count = len(file_name)
+    files = sorted(
+        path for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() == ".png"
+    )
+    if not files:
+        raise ValueError(f"No PNG files found in: {directory}")
+    if frame_rate <= 0:
+        raise ValueError("Frame rate must be greater than zero.")
 
-    print(colored("Renaming files...", 'cyan'))
-    # Rename the files
-    for i, file in tqdm(enumerate(files)):
-        os.rename(os.path.join(directory, file), os.path.join(
-            directory, f'{i:0{digits_count}d}.png'))
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError(
+            "FFmpeg was not found. Install it and add its bin folder to PATH."
+        )
 
-    print(colored("Compiling video...", 'cyan'))
-    # Compile the video using FFmpeg
-    subprocess.run(['ffmpeg', '-framerate', '24', '-i', f'{directory}/%0{digits_count}d.png', '-c:v', 'libx264', '-r',
-                   '24', '-pix_fmt', 'yuv420p', '-y', f'{directory}/output.mp4'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print(colored("      COMPLETED       \n", 'cyan', attrs=['reverse']))
+    output_file = directory / "output.mp4"
+    print(f"Compiling {len(files)} PNG files at {frame_rate} FPS...")
 
-    # Open the video in file explorer
-    output_file = os.path.join(directory, 'output.mp4')
-    output_file = os.path.abspath(output_file)
-    print("File Location: " + colored(f"{output_file}", 'cyan'))
-    subprocess.run(['explorer', output_file])
+    # Copy frames into a temporary numbered sequence. Source images are never
+    # renamed or modified.
+    with tempfile.TemporaryDirectory(prefix="meow_png_frames_") as temp_folder:
+        temp_directory = Path(temp_folder)
+        for index, source in enumerate(files):
+            shutil.copy2(source, temp_directory / f"{index:06d}.png")
 
-    output_file_parent_directory = os.path.dirname(output_file)
-    subprocess.run(['explorer', output_file_parent_directory],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        subprocess.run([
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel", "error",
+            "-framerate", str(frame_rate),
+            "-i", str(temp_directory / "%06d.png"),
+            "-c:v", "libx264",
+            "-r", str(frame_rate),
+            "-pix_fmt", "yuv420p",
+            "-y",
+            str(output_file),
+        ], check=True)
+
+    print("      COMPLETED")
+    print(f"File Location: {output_file.resolve()}")
+
+    if os.name == "nt":
+        subprocess.run(
+            ["explorer", "/select,", str(output_file.resolve())],
+            check=False,
+        )
+
+    return output_file

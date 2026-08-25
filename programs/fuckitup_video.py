@@ -1,53 +1,133 @@
-import os
+from fractions import Fraction
+from pathlib import Path
+import json
 import random
+import shutil
 import subprocess
+import tempfile
 
-def parse_duration_seconds(duration_line):
-    duration_value = duration_line.split("Duration:")[1].split(",")[0].strip()
-    hours_str, minutes_str, seconds_str = duration_value.split(":")
-    return int(hours_str) * 3600 + int(minutes_str) * 60 + float(seconds_str)
 
-# Prompt user for input directory, BPM, and output video file
-input_dir = input("Enter input directory: ")
-while not os.path.isdir(input_dir):
-    print("Invalid directory. Please enter a valid directory.")
-    input_dir = input("Enter input directory: ")
+def probe_video(ffprobe, video_path):
+    result = subprocess.run([
+        ffprobe,
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=avg_frame_rate:format=duration",
+        "-of", "json",
+        str(video_path),
+    ], check=True, capture_output=True, text=True)
+    data = json.loads(result.stdout)
+    streams = data.get("streams", [])
+    if not streams:
+        raise ValueError(f"No video stream found in: {video_path}")
+    duration = float(data["format"]["duration"])
+    frame_rate = float(Fraction(streams[0]["avg_frame_rate"]))
+    if duration <= 0 or frame_rate <= 0:
+        raise ValueError(f"Invalid duration or frame rate in: {video_path}")
+    return duration, frame_rate
 
-bpm = int(input("Enter BPM: "))
-while bpm <= 0:
-    print("Invalid BPM. Please enter a positive number.")
-    bpm = int(input("Enter BPM: "))
 
-output_video = input("Enter output video file name (including the extension): ")
+def randomized_output_path(input_file, requested_output, multiple_inputs):
+    requested = Path(requested_output).expanduser()
+    if not requested.suffix:
+        requested = requested.with_suffix(".mp4")
+    if multiple_inputs:
+        requested = requested.with_name(
+            f"{requested.stem}_{input_file.stem}{requested.suffix}"
+        )
+    return requested
 
-# Calculate length of one beat in seconds
-beat_length = 60 / bpm
-slice_length = beat_length / 4
 
-# Get all video files in input directory
-video_files = [f for f in os.listdir(input_dir) if f.endswith(".mp4")]
-if len(video_files) == 0:
-    print("No video files found in the directory.")
-    exit()
+def rearrange_video(input_directory, bpm, output_video):
+    directory = Path(input_directory).expanduser()
+    if not directory.is_dir():
+        raise ValueError(f"Folder does not exist: {directory}")
+    if bpm <= 0:
+        raise ValueError("BPM must be greater than zero.")
 
-# Loop through video files
-for file in video_files:
-    # Get the duration of the video
-    output = subprocess.check_output(['ffmpeg', '-i', os.path.join(input_dir, file), '-vstats', '2>&1'])
-    duration_line = [line for line in output.decode().split("\n") if "Duration" in line][0]
-    duration = parse_duration_seconds(duration_line)
-    # Randomly select a portion of the video to slice
-    max_start = max(0, duration - (slice_length * 4))
-    start = random.uniform(0, max_start)
-    end = start + (slice_length * 4)
-    # Use FFmpeg to extract the frames from the selected portion of the video
-    output = subprocess.check_output(['ffmpeg', '-i', os.path.join(input_dir, file), '-ss', str(start), '-t', str((slice_length * 4)), '-vf', 'select=not(mod(n\,100))', '-vsync', 'vfr', 'frames/frame%03d.jpg'])
-    # Get all the frames in the frames directory
-    frames = [f for f in os.listdir("frames/") if f.endswith(".jpg")]
-    random.shuffle(frames)
-    # Use FFmpeg to create a new video from the randomly ordered frames
-    output = subprocess.check_output(['ffmpeg', '-framerate', '24', '-i', 'frames/%03d.jpg', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', 'output_'+output_video])
-    # Clean up the frames directory
-    for frame in frames:
-        os.remove("frames/"+frame)
-    os.rmdir("frames/")
+    video_files = sorted(
+        path for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() == ".mp4"
+    )
+    if not video_files:
+        print(f"No MP4 files found in: {directory}")
+        return []
+
+    ffmpeg = shutil.which("ffmpeg")
+    ffprobe = shutil.which("ffprobe")
+    if ffmpeg is None or ffprobe is None:
+        raise RuntimeError("FFmpeg and FFprobe must be installed and available on PATH.")
+
+    beat_length = 60 / bpm
+    outputs = []
+    multiple_inputs = len(video_files) > 1
+
+    for source in video_files:
+        duration, frame_rate = probe_video(ffprobe, source)
+        clip_length = min(beat_length, duration)
+        start = random.uniform(0, max(0, duration - clip_length))
+        destination = randomized_output_path(source, output_video, multiple_inputs)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="meow_video_frames_") as temp_folder:
+            temp_directory = Path(temp_folder)
+            extracted = temp_directory / "extracted"
+            shuffled = temp_directory / "shuffled"
+            extracted.mkdir()
+            shuffled.mkdir()
+
+            subprocess.run([
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel", "error",
+                "-ss", str(start),
+                "-i", str(source),
+                "-t", str(clip_length),
+                "-vsync", "0",
+                str(extracted / "%06d.png"),
+            ], check=True)
+
+            frames = sorted(extracted.glob("*.png"))
+            if not frames:
+                raise RuntimeError(f"No frames could be extracted from: {source}")
+            random.shuffle(frames)
+            for index, frame in enumerate(frames):
+                shutil.copy2(frame, shuffled / f"{index:06d}.png")
+
+            subprocess.run([
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel", "error",
+                "-framerate", f"{frame_rate:.12g}",
+                "-i", str(shuffled / "%06d.png"),
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-y",
+                str(destination),
+            ], check=True)
+
+        outputs.append(destination)
+        print(f"Created: {destination.resolve()}")
+
+    return outputs
+
+
+def main():
+    input_directory = input("Enter input directory: ").strip().strip('"')
+    bpm = float(input("Enter BPM: "))
+    output_video = input(
+        "Enter output video path (including .mp4): "
+    ).strip().strip('"')
+    rearrange_video(input_directory, bpm, output_video)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (
+        RuntimeError,
+        ValueError,
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+    ) as error:
+        print(f"Error: {error}")
