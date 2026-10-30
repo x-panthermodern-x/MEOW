@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 
 import yt_dlp
+from yt_dlp.utils import DownloadError
 
 try:
     from termcolor import colored
@@ -49,6 +50,54 @@ def choose_output_format():
         print("Please enter 1 for MP3 or 2 for WAV.")
 
 
+def choose_cookie_browser():
+    """Ask which browser contains the signed-in YouTube account."""
+    browsers = {
+        "1": "chrome",
+        "2": "edge",
+        "3": "firefox",
+        "chrome": "chrome",
+        "edge": "edge",
+        "firefox": "firefox",
+    }
+
+    print(colored(
+        "\nThis video requires a signed-in, age-verified YouTube account.",
+        "yellow",
+    ))
+    print("Choose the browser where you are signed into YouTube:")
+    print("  [1] Chrome")
+    print("  [2] Edge")
+    print("  [3] Firefox")
+    print("  [4] Cancel")
+
+    while True:
+        choice = input(colored("Browser: ", "cyan")).strip().lower()
+        if choice in browsers:
+            return browsers[choice]
+        if choice in ("4", "cancel", "q", "quit"):
+            return None
+        print("Please enter 1, 2, 3, or 4.")
+
+
+def needs_browser_authentication(error):
+    message = str(error).lower()
+    indicators = (
+        "age-restricted",
+        "age restricted",
+        "confirm your age",
+        "sign in",
+        "login required",
+    )
+    return any(indicator in message for indicator in indicators)
+
+
+def run_download(url, options):
+    """Run yt-dlp and allow its expected download errors to be handled cleanly."""
+    with yt_dlp.YoutubeDL(options) as downloader:
+        downloader.download([url])
+
+
 def download_sample(url, output_directory, file_name, start, end, output_format):
     if end <= start:
         raise ValueError("The END time must be later than the START time.")
@@ -79,8 +128,33 @@ def download_sample(url, output_directory, file_name, start, end, output_format)
             "postprocessors": [postprocessor],
         }
 
-        with yt_dlp.YoutubeDL(options) as downloader:
-            downloader.download([url])
+        try:
+            run_download(url, options)
+        except DownloadError as error:
+            if not needs_browser_authentication(error):
+                raise RuntimeError(f"YouTube download failed: {error}") from None
+
+            browser = choose_cookie_browser()
+            if browser is None:
+                raise RuntimeError("Download cancelled.") from None
+
+            print(colored(
+                f"Retrying with the signed-in YouTube account from {browser.title()}...",
+                "yellow",
+            ))
+            authenticated_options = {
+                **options,
+                "cookiesfrombrowser": (browser,),
+            }
+            try:
+                run_download(url, authenticated_options)
+            except DownloadError as authenticated_error:
+                raise RuntimeError(
+                    "YouTube authentication failed. Make sure you are signed into "
+                    f"an age-verified YouTube account in {browser.title()}, close "
+                    "that browser completely, and try again. "
+                    f"Details: {authenticated_error}"
+                ) from None
 
         source = Path(temp_folder) / f"source.{output_format}"
         if not source.exists():
@@ -144,5 +218,8 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (RuntimeError, ValueError) as error:
-        print(colored(f"Error: {error}", "red"))
+    except (RuntimeError, ValueError, KeyboardInterrupt) as error:
+        if isinstance(error, KeyboardInterrupt):
+            print(colored("\nCancelled.", "red"))
+        else:
+            print(colored(f"Error: {error}", "red"))
